@@ -15,7 +15,7 @@ def initialize():
 #color mode: gray scal
 #resolution rate: 640X480 VGA
 #focus area: 300X300
-    print("Start Initialization")
+    print(" ------------------------\n|  Start Initialization  |\n ------------------------")
     sensor.reset()
     sensor.set_pixformat(sensor.GRAYSCALE)
     sensor.set_framesize(sensor.VGA)
@@ -55,18 +55,52 @@ def QR_decode(img):
 
 #def lcd():
 
-def UART_send(input):
-    uart.write(input+"\r")
+def UART_send(str1):
+    pyb.delay(100)
+    leng = len(str1)
+    group = int(len(str1)/64)
+    datalist = [0]
+    data = 0
+    package_group = 1
+
+    #find # of groups in package
+    if(len(str1)%64 != 0):
+        group +=1
+    print(group, " groups")
+    package_list = []
+    i = 0
+    while (i<group+1):
+        pyb.delay(200)
+        datalist.append(str1[i*58:(i+1)*58-1])
+        print(str1[i*58:(i+1)*58-1])
+        package_list.append([group,i,str1[i*58:(i+1)*58-1]])
+
+        i+=1
+        #uart.write(str1[i*58:(i+1)*58-1])
+        #pyb.delay(200)
+        #uart.sendbreak()
+    print(package_list)
+    #while(True):
+
+
+    uart.write("allsent!\r")
+    pyb.delay(100)
     uart.sendbreak()
 
 def active_mode1(p):
     pin3.irq(trigger=Pin.IRQ_RISING, handler=None)
+    value1 = pin3.value()
+   # print(value1)
+    pyb.delay(100)
+    value2 = pin3.value()
+    #print(value2)
+    #if(value2==1):
     global globalval
     globalval +=1
     if globalval > 1:
         globalval = 0
+    return
     #print(p)
-    pin3.irq(trigger=Pin.IRQ_RISING, handler=active_mode1)
 def active_mode():
     #start_flag
     global globalval
@@ -74,11 +108,14 @@ def active_mode():
     active_run_count += 1
     initialize()
     UART_send("ready")
+    pyb.delay(500)
+    uart.sendbreak()
+
+    pyb.delay(500)
+    print(" ---------------------\n|  Start scanning!  |\n---------------------\n\n")
     while(True):
         clock.tick()
         img = sensor.snapshot()     #get the raw image
-        print("Start scanning!")
-
         #initialize the red led indication in active mode
         red_led = pyb.LED(1)
         red_led.toggle()
@@ -91,16 +128,19 @@ def active_mode():
 
         if break_indicator == 1:
             UART_send(payload)
-            print("break_indicator",break_indicator)
+            print("Scan complete!",break_indicator)
             globalval = 0
+            pin3.irq(trigger=Pin.IRQ_FALLING, handler=active_mode1)
             break
 
-#system delay for 500ms
-        pyb.delay(500)
+#system delay for 100ms
+        pyb.delay(100)
+
     pyb.delay(3000)
+    print("\n ----------------\n|  Go to idle  |\n----------------\n")
+    red_led.off()
     idle_state()
 
-pin3.irq(trigger=Pin.IRQ_RISING, handler=active_mode1)
 
 
 def idle_state():
@@ -108,19 +148,26 @@ def idle_state():
     global globalval
     global active_run_count
     count = 0
+    active_run_count = 0
+
+
+
     while(True):
         #clock.tick()
         #blue LED indicates sleep mode
+        #print(pin3.value())
         print('active run = ',active_run_count)
         if (globalval != 0) and (active_run_count == 0):
             active_mode()
             active_run_count = 0
-        print("sleep",count)
+        print("--------------------------------\nIn sleep mode",count)
 
         red_blue = pyb.LED(3)
         red_blue.toggle()
         pyb.delay(500)
         count +=1
-
+pyb.delay(1000)
+def start():
+    pin3.irq(trigger=Pin.IRQ_RISING, handler=active_mode1)
+start()
 idle_state()
-
