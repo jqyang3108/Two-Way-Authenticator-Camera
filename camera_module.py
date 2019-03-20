@@ -45,7 +45,7 @@ def QR_decode(img):
     payload = 0
     #print("current a is ______ ", type(a))
     if qr_list == []:
-        print("-------------------------------\nFinding QR Codes......  ",qr_list)
+        print("\nFinding QR Codes......  ",qr_list,"    |")
     else:
         payload = qr_list[0][4]
         print("-------------------------------\nFound! Decode Result: ")
@@ -73,13 +73,44 @@ def UART_send(str1):
         pyb.delay(200)
         datalist.append(str1[i*58:(i+1)*58-1])
         print(str1[i*58:(i+1)*58-1])
-        package_list.append([group,i,str1[i*58:(i+1)*58-1]])
+        package_list.append("{}@@{}".format(i,str1[i*58:(i+1)*58-1]))
 
         i+=1
         #uart.write(str1[i*58:(i+1)*58-1])
         #pyb.delay(200)
         #uart.sendbreak()
+
+
+    #pyb.delay(200)
     print(package_list)
+    mcu_resp = 0
+    count = 0
+    while(True):
+        print("-------------------------------\n  Sending  \n")
+        uart.write(package_list[count])
+        pyb.delay(500)
+        uart.sendbreak()
+        pyb.delay(200)
+        while(True):
+            if(uart.any()):
+                mcu_resp = uart.readline().decode("utf-8").split('@@')
+                print("mcu_resp is ", mcu_resp)
+                break
+
+        if (mcu_resp[1] == "received\x00"):
+            print("current group received")
+            count+=1
+        elif(mcu_resp[1] == "resend\x00"):
+            print("not received")
+        else:
+            print("submisstion error!",count)
+        if((count+1) == group):
+            print("submission complete")
+            break
+
+        print("\n-------------Group: {} Current Group: {}---------------------".format(group, count))
+        pyb.delay(500)
+
     #while(True):
 
 
@@ -90,11 +121,8 @@ def UART_send(str1):
 def active_mode1(p):
     pin3.irq(trigger=Pin.IRQ_RISING, handler=None)
     value1 = pin3.value()
-   # print(value1)
     pyb.delay(100)
     value2 = pin3.value()
-    #print(value2)
-    #if(value2==1):
     global globalval
     globalval +=1
     if globalval > 1:
@@ -107,12 +135,12 @@ def active_mode():
     global active_run_count
     active_run_count += 1
     initialize()
-    UART_send("ready")
+    uart.write("ready")
     pyb.delay(500)
     uart.sendbreak()
 
     pyb.delay(500)
-    print(" ---------------------\n|  Start scanning!  |\n---------------------\n\n")
+    print(" ---------------------\n|  Start scanning!  |\n---------------------\n\n--------------------------")
     while(True):
         clock.tick()
         img = sensor.snapshot()     #get the raw image
@@ -149,9 +177,6 @@ def idle_state():
     global active_run_count
     count = 0
     active_run_count = 0
-
-
-
     while(True):
         #clock.tick()
         #blue LED indicates sleep mode
