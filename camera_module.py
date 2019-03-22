@@ -24,8 +24,6 @@ def initialize():
     sensor.set_windowing((300, 300))
     lcd.init() # Initialize the lcd screen.
 
-
-
 #PIN initialization
 ##UART
 ###set 3
@@ -58,27 +56,23 @@ def QR_decode(img):
 def UART_send(str1):
     pyb.delay(100)
     leng = len(str1)
-    group = int(len(str1)/64)
-    datalist = [0]
+    group = int(len(str1)/58)
+    datalist = []
+    package_list =[]
     data = 0
     package_group = 1
 
     #find # of groups in package
-    if(len(str1)%64 != 0):
+    if(len(str1)%58 != 0):
         group +=1
-    print(group, " groups")
-    package_list = []
+    #print(group, " groups")
     i = 0
-    while (i<group+1):
-        pyb.delay(200)
-        datalist.append(str1[i*58:(i+1)*58-1])
-        print(str1[i*58:(i+1)*58-1])
-        package_list.append("{}@@{}".format(i,str1[i*58:(i+1)*58-1]))
 
+    datalist = [str1[i:i+58] for i in range(0, len(str1), 58)]
+    for data in datalist:
+        print(i)
+        package_list.append("{}@@{}".format(i,data))
         i+=1
-        #uart.write(str1[i*58:(i+1)*58-1])
-        #pyb.delay(200)
-        #uart.sendbreak()
 
 
     #pyb.delay(200)
@@ -86,37 +80,35 @@ def UART_send(str1):
     mcu_resp = 0
     count = 0
     while(True):
-        print("-------------------------------\n  Sending  \n")
+        print("\n-------------Total Group: {} Sending Group: {}---------------------".format(group, count+1))
         uart.write(package_list[count])
-        pyb.delay(500)
+        pyb.delay(200)
         uart.sendbreak()
         pyb.delay(200)
         while(True):
             if(uart.any()):
                 mcu_resp = uart.readline().decode("utf-8").split('@@')
-                print("mcu_resp is ", mcu_resp)
+                #print("mcu_resp is ", mcu_resp)
                 break
 
         if (mcu_resp[1] == "received\x00"):
-            print("current group received")
+            print("Group {} received".format(count+1))
             count+=1
         elif(mcu_resp[1] == "resend\x00"):
-            print("not received")
+            print("Group {} not received".format(count+1))
         else:
-            print("submisstion error!",count)
-        if((count+1) == group):
-            print("submission complete")
+            print("Transmission error!",count)
+        print('--------------------------\n')
+        if((count) == group):
+            print("\n========submission complete============\n")
+            uart.write("allsent!\r")
+            pyb.delay(100)
+            uart.sendbreak()
             break
 
-        print("\n-------------Group: {} Current Group: {}---------------------".format(group, count))
-        pyb.delay(500)
+        pyb.delay(200)
 
     #while(True):
-
-
-    uart.write("allsent!\r")
-    pyb.delay(100)
-    uart.sendbreak()
 
 def active_mode1(p):
     pin3.irq(trigger=Pin.IRQ_RISING, handler=None)
@@ -156,7 +148,7 @@ def active_mode():
 
         if break_indicator == 1:
             UART_send(payload)
-            print("Scan complete!",break_indicator)
+            #print("Scan complete!",break_indicator)
             globalval = 0
             pin3.irq(trigger=Pin.IRQ_FALLING, handler=active_mode1)
             break
@@ -165,7 +157,7 @@ def active_mode():
         pyb.delay(100)
 
     pyb.delay(3000)
-    print("\n ----------------\n|  Go to idle  |\n----------------\n")
+    print("\n ----------------\n| Scan complete! Go to idle  |\n----------------\n")
     red_led.off()
     idle_state()
 
